@@ -34,6 +34,7 @@
             font-weight: bold;
             z-index: 10;
             box-sizing: border-box;
+            pointer-events: none; /* ให้คลิกทะลุไปที่กล้องได้ */
         }
 
         .accent {
@@ -65,7 +66,7 @@
             background-color: #000;
         }
 
-        /* ส่วนควบคุมด้านล่าง (ลอยทับวิดีโอ) */
+        /* ส่วนควบคุมด้านล่างสำหรับแนวตั้ง (Portrait) */
         .controls {
             position: absolute;
             bottom: 0;
@@ -77,6 +78,7 @@
             background: rgba(0, 0, 0, 0.6);
             backdrop-filter: blur(5px);
             display: flex;
+            flex-direction: row;
             justify-content: center;
             align-items: center;
             gap: 15px;
@@ -107,6 +109,7 @@
             border: 4px solid #fff;
             box-shadow: 0 0 15px rgba(255, 94, 98, 0.6);
             outline: none;
+            flex-shrink: 0;
         }
 
         /* ปุ่มถ่ายใหม่ */
@@ -141,6 +144,34 @@
             border-radius: 10px;
             width: 80%;
             z-index: 20;
+        }
+
+        /* จัดการ Layout เมื่อหมุนเป็นแนวนอน (Landscape) */
+        @media (orientation: landscape) {
+            .controls {
+                top: 0;
+                bottom: 0;
+                left: auto;
+                right: 0;
+                width: 140px; /* กำหนดความกว้างของแถบด้านข้าง */
+                height: 100%;
+                flex-direction: column; /* เปลี่ยนปุ่มให้เรียงจากบนลงล่าง */
+                padding: 20px;
+                /* ป้องกันปุ่มตกขอบจอด้านขวา */
+                padding-right: calc(20px + env(safe-area-inset-right, 0px));
+                justify-content: center;
+            }
+
+            header {
+                /* ลดความกว้างเพื่อหลบแถบปุ่มด้านขวา */
+                width: calc(100% - 140px);
+                padding-left: calc(15px + env(safe-area-inset-left, 0px));
+            }
+
+            #retake-btn, #process-btn {
+                width: 100%;
+                flex: none; /* ยกเลิกการขยายตัวแนวนอนแบบ flex-grow */
+            }
         }
     </style>
 </head>
