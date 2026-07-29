@@ -12,78 +12,82 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #000;
             color: white;
-            /* ใช้ 100dvh เพื่อให้พอดีกับหน้าจอมือถือจริงแม้มีแถบ URL */
             height: 100dvh;
             width: 100vw;
+            display: flex;
+            flex-direction: column;
             overflow: hidden;
-            position: relative;
         }
 
-        /* ส่วนหัวแอปพลิเคชัน (ลอยทับวิดีโอ) */
+        /* ส่วนหัวแอปพลิเคชัน (ล็อกไว้ด้านบนสุด) */
         header {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
             text-align: center;
-            /* รองรับรอยบากด้านบนของมือถือ */
             padding: calc(15px + env(safe-area-inset-top, 0px)) 0 15px 0;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(5px);
+            background: #111;
             font-size: 1.5rem;
             font-weight: bold;
+            flex-shrink: 0;
             z-index: 10;
-            box-sizing: border-box;
-            pointer-events: none; /* ให้คลิกทะลุไปที่กล้องได้ */
+            border-bottom: 1px solid #222;
         }
 
         .accent {
             color: #ff5e62;
         }
 
-        /* พื้นที่แสดงกล้อง (เต็มจอ) */
+        /* พื้นที่ตรงกลาง (โซนแสดงกล้อง) */
         #main-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             background: #000;
+            width: 100%;
+            overflow: hidden;
         }
 
-        video {
+        /* กรอบภาพล็อกอัตราส่วน 3:4 */
+        .camera-frame {
+            width: 100%;
+            aspect-ratio: 3 / 4;
+            max-height: 100%;
+            position: relative;
+            background: #1a1a1a;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        /* เมื่อหมุนจอเป็นแนวนอน ให้สลับกรอบภาพเป็น 4:3 */
+        @media (orientation: landscape) {
+            .camera-frame {
+                aspect-ratio: 4 / 3;
+                height: 100%;
+                width: auto;
+            }
+        }
+
+        video, canvas {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* บังคับให้ภาพเต็มจอเสมอโดยไม่ผิดสัดส่วน */
+            object-fit: cover; /* บังคับภาพให้เต็มกรอบ 3:4 โดยไม่ผิดสัดส่วน */
+            display: block;
         }
 
         canvas {
             display: none;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            background-color: #000;
         }
 
-        /* ส่วนควบคุมด้านล่างสำหรับแนวตั้ง (Portrait) */
+        /* ส่วนควบคุมด้านล่าง (ล็อกไว้ล่างสุดเสมอ) */
         .controls {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            padding: 20px;
-            /* ป้องกันการโดนแถบ Home Bar ของมือถือบัง */
-            padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(5px);
+            padding: 15px 20px;
+            padding-bottom: calc(15px + env(safe-area-inset-bottom, 0px));
+            background: #111;
             display: flex;
-            flex-direction: row;
             justify-content: center;
             align-items: center;
             gap: 15px;
-            z-index: 10;
-            box-sizing: border-box;
+            flex-shrink: 0;
+            min-height: 110px;
+            border-top: 1px solid #222;
         }
 
         button {
@@ -100,11 +104,11 @@
             transform: scale(0.95);
         }
 
-        /* ปุ่มชัตเตอร์สำหรับถ่ายรูป */
+        /* ปุ่มชัตเตอร์วงกลม */
         #snap-btn {
             background: #ff5e62;
-            width: 80px;
-            height: 80px;
+            width: 75px;
+            height: 75px;
             border-radius: 50%;
             border: 4px solid #fff;
             box-shadow: 0 0 15px rgba(255, 94, 98, 0.6);
@@ -115,21 +119,23 @@
         /* ปุ่มถ่ายใหม่ */
         #retake-btn {
             display: none;
-            background: #444;
+            background: #333;
             color: white;
             flex: 1;
+            max-width: 150px;
         }
 
-        /* ปุ่มดำเนินการต่อ (แปลงภาพ) */
+        /* ปุ่มดำเนินการต่อ */
         #process-btn {
             display: none;
             background: #4CAF50;
             color: white;
             flex: 2;
-            box-shadow: 0 4px 10px rgba(76, 175, 80, 0.4);
+            max-width: 250px;
+            box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3);
         }
 
-        /* ข้อความแจ้งเตือนกรณีเข้าถึงกล้องไม่ได้ */
+        /* แจ้งเตือนข้อผิดพลาด */
         #error-msg {
             position: absolute;
             top: 50%;
@@ -145,34 +151,6 @@
             width: 80%;
             z-index: 20;
         }
-
-        /* จัดการ Layout เมื่อหมุนเป็นแนวนอน (Landscape) */
-        @media (orientation: landscape) {
-            .controls {
-                top: 0;
-                bottom: 0;
-                left: auto;
-                right: 0;
-                width: 140px; /* กำหนดความกว้างของแถบด้านข้าง */
-                height: 100%;
-                flex-direction: column; /* เปลี่ยนปุ่มให้เรียงจากบนลงล่าง */
-                padding: 20px;
-                /* ป้องกันปุ่มตกขอบจอด้านขวา */
-                padding-right: calc(20px + env(safe-area-inset-right, 0px));
-                justify-content: center;
-            }
-
-            header {
-                /* ลดความกว้างเพื่อหลบแถบปุ่มด้านขวา */
-                width: calc(100% - 140px);
-                padding-left: calc(15px + env(safe-area-inset-left, 0px));
-            }
-
-            #retake-btn, #process-btn {
-                width: 100%;
-                flex: none; /* ยกเลิกการขยายตัวแนวนอนแบบ flex-grow */
-            }
-        }
     </style>
 </head>
 <body>
@@ -180,10 +158,13 @@
     <header>Color<span class="accent">Snap</span></header>
 
     <div id="main-container">
-        <video id="camera-stream" autoplay playsinline></video>
-        <canvas id="photo-canvas"></canvas>
+        <!-- กรอบรูปอัตราส่วน 3:4 -->
+        <div class="camera-frame">
+            <video id="camera-stream" autoplay playsinline></video>
+            <canvas id="photo-canvas"></canvas>
+            <div id="error-msg">ไม่สามารถเข้าถึงกล้องได้ กรุณาตรวจสอบการอนุญาต</div>
+        </div>
     </div>
-    <div id="error-msg">ไม่สามารถเข้าถึงกล้องได้ กรุณาตรวจสอบการอนุญาตใช้งานกล้องบนเบราว์เซอร์ของคุณ</div>
 
     <div class="controls">
         <button id="snap-btn" aria-label="Take Photo"></button>
@@ -202,7 +183,7 @@
         
         let currentStream = null;
 
-        // ฟังก์ชันเปิดกล้อง
+        // เปิดกล้อง
         async function startCamera() {
             try {
                 currentStream = await navigator.mediaDevices.getUserMedia({
@@ -227,7 +208,7 @@
             }
         }
 
-        // ฟังก์ชันปิดกล้อง
+        // ปิดกล้อง
         function stopCamera() {
             if (currentStream) {
                 currentStream.getTracks().forEach(track => track.stop());
@@ -235,16 +216,16 @@
             }
         }
 
-        // เหตุการณ์เมื่อกดปุ่มถ่ายรูป
+        // กดถ่ายรูป
         snapBtn.addEventListener('click', () => {
             if (!currentStream) return;
 
-            // วาดภาพลง Canvas
+            // วาดรูปลง Canvas ด้วยขนาดจริงของเซนเซอร์กล้อง
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            // สลับการแสดงผล UI
+            // สลับ UI
             video.style.display = 'none';
             canvas.style.display = 'block';
             
@@ -253,12 +234,10 @@
             processBtn.style.display = 'block';
         });
 
-        // เหตุการณ์เมื่อกดปุ่มถ่ายใหม่
+        // ถ่ายใหม่
         retakeBtn.addEventListener('click', () => {
-            // สลับ UI กลับมาแสดงวิดีโอที่สแตนด์บายอยู่
             canvas.style.display = 'none';
             video.style.display = 'block';
-            
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             retakeBtn.style.display = 'none';
@@ -266,13 +245,13 @@
             snapBtn.style.display = 'block';
         });
 
-        // เหตุการณ์เมื่อกดปุ่มดำเนินการต่อ
+        // ดำเนินการต่อ
         processBtn.addEventListener('click', () => {
             stopCamera();
-            alert("รูปภาพพร้อมแล้ว! ขั้นตอนต่อไปเราจะนำภาพนี้ไปประมวลผลผ่าน OpenCV.js เพื่อแปลงเป็นภาพลายเส้นครับ");
+            alert("รูปภาพอัตราส่วน 3:4 พร้อมแล้ว! ขั้นตอนต่อไปเราจะนำภาพนี้ไปประมวลผลผ่าน OpenCV.js ครับ");
         });
 
-        // เรียกใช้งานเมื่อโหลดเสร็จ
+        // โหลดเสร็จให้เริ่มกล้อง
         window.addEventListener('load', startCamera);
     </script>
 </body>
