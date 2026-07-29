@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ColorSnap - เปลี่ยนรอบตัวเป็นสมุดระบายสี</title>
+    <style>
+        /* รีเซ็ตค่าเริ่มต้นและตั้งค่าฟอนต์ */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #000;
+            color: white;
+            /* ใช้ 100dvh เพื่อให้พอดีกับหน้าจอมือถือจริงแม้มีแถบ URL */
+            height: 100dvh;
+            width: 100vw;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* ส่วนหัวแอปพลิเคชัน (ลอยทับวิดีโอ) */
+        header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            /* รองรับรอยบากด้านบนของมือถือ */
+            padding: calc(15px + env(safe-area-inset-top, 0px)) 0 15px 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            font-size: 1.5rem;
+            font-weight: bold;
+            z-index: 10;
+            box-sizing: border-box;
+        }
+
+        .accent {
+            color: #ff5e62;
+        }
+
+        /* พื้นที่แสดงกล้อง (เต็มจอ) */
+        #main-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background: #000;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* บังคับให้ภาพเต็มจอเสมอโดยไม่ผิดสัดส่วน */
+        }
+
+        canvas {
+            display: none;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            background-color: #000;
+        }
+
+        /* ส่วนควบคุมด้านล่าง (ลอยทับวิดีโอ) */
+        .controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            /* ป้องกันการโดนแถบ Home Bar ของมือถือบัง */
+            padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            z-index: 10;
+            box-sizing: border-box;
+        }
+
+        button {
+            border: none;
+            border-radius: 30px;
+            padding: 15px 20px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        /* ปุ่มชัตเตอร์สำหรับถ่ายรูป */
+        #snap-btn {
+            background: #ff5e62;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 4px solid #fff;
+            box-shadow: 0 0 15px rgba(255, 94, 98, 0.6);
+            outline: none;
+        }
+
+        /* ปุ่มถ่ายใหม่ */
+        #retake-btn {
+            display: none;
+            background: #444;
+            color: white;
+            flex: 1;
+        }
+
+        /* ปุ่มดำเนินการต่อ (แปลงภาพ) */
+        #process-btn {
+            display: none;
+            background: #4CAF50;
+            color: white;
+            flex: 2;
+            box-shadow: 0 4px 10px rgba(76, 175, 80, 0.4);
+        }
+
+        /* ข้อความแจ้งเตือนกรณีเข้าถึงกล้องไม่ได้ */
+        #error-msg {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff5e62;
+            text-align: center;
+            padding: 20px;
+            display: none;
+            font-size: 1.1rem;
+            background: rgba(0,0,0,0.8);
+            border-radius: 10px;
+            width: 80%;
+            z-index: 20;
+        }
+    </style>
+</head>
+<body>
+
+    <header>Color<span class="accent">Snap</span></header>
+
+    <div id="main-container">
+        <video id="camera-stream" autoplay playsinline></video>
+        <canvas id="photo-canvas"></canvas>
+    </div>
+    <div id="error-msg">ไม่สามารถเข้าถึงกล้องได้ กรุณาตรวจสอบการอนุญาตใช้งานกล้องบนเบราว์เซอร์ของคุณ</div>
+
+    <div class="controls">
+        <button id="snap-btn" aria-label="Take Photo"></button>
+        <button id="retake-btn">ถ่ายใหม่</button>
+        <button id="process-btn">แปลงเป็นภาพลายเส้น</button>
+    </div>
+
+    <script>
+        const video = document.getElementById('camera-stream');
+        const canvas = document.getElementById('photo-canvas');
+        const ctx = canvas.getContext('2d');
+        const snapBtn = document.getElementById('snap-btn');
+        const retakeBtn = document.getElementById('retake-btn');
+        const processBtn = document.getElementById('process-btn');
+        const errorMsg = document.getElementById('error-msg');
+        
+        let currentStream = null;
+
+        // ฟังก์ชันเปิดกล้อง
+        async function startCamera() {
+            try {
+                currentStream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
+                    audio: false
+                });
+                
+                video.srcObject = currentStream;
+                errorMsg.style.display = 'none';
+                
+                snapBtn.style.display = 'block';
+                retakeBtn.style.display = 'none';
+                processBtn.style.display = 'none';
+            } catch (err) {
+                console.error("Error accessing the camera: ", err);
+                errorMsg.style.display = 'block';
+                snapBtn.style.display = 'none';
+            }
+        }
+
+        // ฟังก์ชันปิดกล้อง
+        function stopCamera() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+            }
+        }
+
+        // เหตุการณ์เมื่อกดปุ่มถ่ายรูป
+        snapBtn.addEventListener('click', () => {
+            if (!currentStream) return;
+
+            // วาดภาพลง Canvas
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // สลับการแสดงผล UI
+            video.style.display = 'none';
+            canvas.style.display = 'block';
+            
+            snapBtn.style.display = 'none';
+            retakeBtn.style.display = 'block';
+            processBtn.style.display = 'block';
+        });
+
+        // เหตุการณ์เมื่อกดปุ่มถ่ายใหม่
+        retakeBtn.addEventListener('click', () => {
+            // สลับ UI กลับมาแสดงวิดีโอที่สแตนด์บายอยู่
+            canvas.style.display = 'none';
+            video.style.display = 'block';
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            retakeBtn.style.display = 'none';
+            processBtn.style.display = 'none';
+            snapBtn.style.display = 'block';
+        });
+
+        // เหตุการณ์เมื่อกดปุ่มดำเนินการต่อ
+        processBtn.addEventListener('click', () => {
+            stopCamera();
+            alert("รูปภาพพร้อมแล้ว! ขั้นตอนต่อไปเราจะนำภาพนี้ไปประมวลผลผ่าน OpenCV.js เพื่อแปลงเป็นภาพลายเส้นครับ");
+        });
+
+        // เรียกใช้งานเมื่อโหลดเสร็จ
+        window.addEventListener('load', startCamera);
+    </script>
+</body>
+</html>
