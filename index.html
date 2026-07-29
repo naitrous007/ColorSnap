@@ -44,6 +44,7 @@
             background: #000;
             width: 100%;
             overflow: hidden;
+            position: relative;
         }
 
         /* กรอบภาพล็อกอัตราส่วน 3:4 */
@@ -54,6 +55,7 @@
             position: relative;
             background: #1a1a1a;
             box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            overflow: hidden; /* ป้องกันกรอบโฟกัสล้นขอบ */
         }
 
         video, canvas {
@@ -65,6 +67,52 @@
 
         canvas {
             display: none;
+        }
+
+        /* ระบบ UI โฟกัสจำลอง (กรอบสีเหลือง) */
+        #focus-ring {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            border: 2px solid #FFD700;
+            border-radius: 10px;
+            pointer-events: none; /* ให้กดทะลุได้ */
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(1.5);
+            transition: all 0.3s ease-out;
+            z-index: 5;
+        }
+
+        .focus-animate {
+            opacity: 1 !important;
+            transform: translate(-50%, -50%) scale(1) !important;
+        }
+
+        /* แถบควบคุมการซูม (จะโชว์เมื่อมือถือรองรับ) */
+        #zoom-container {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 300px;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            padding: 10px 15px;
+            border-radius: 20px;
+            display: none; /* ซ่อนไว้ก่อน จะเปิดผ่าน JS */
+            align-items: center;
+            gap: 10px;
+            z-index: 10;
+        }
+
+        #zoom-container span {
+            font-size: 1.2rem;
+        }
+
+        input[type=range] {
+            flex: 1;
+            accent-color: #ff5e62;
         }
 
         /* ส่วนควบคุมด้านล่าง (ล็อกไว้ล่างสุดเสมอ) */
@@ -175,7 +223,6 @@
             100% { transform: rotate(0deg); }
         }
 
-        /* เมื่อหน้าจอเป็นแนวนอน ให้ซ่อนแอปและโชว์หน้าต่างแจ้งเตือน */
         @media (orientation: landscape) {
             header, #main-container, .controls {
                 display: none !important;
@@ -199,9 +246,17 @@
 
     <div id="main-container">
         <!-- กรอบรูปอัตราส่วน 3:4 -->
-        <div class="camera-frame">
+        <div class="camera-frame" id="camera-frame">
             <video id="camera-stream" autoplay playsinline></video>
             <canvas id="photo-canvas"></canvas>
+            <div id="focus-ring"></div>
+            
+            <!-- แถบเลื่อนซูม -->
+            <div id="zoom-container">
+                <span>🔍</span>
+                <input type="range" id="zoom-slider" min="1" max="1" step="0.1" value="1">
+            </div>
+
             <div id="error-msg">ไม่สามารถเข้าถึงกล้องได้ กรุณาตรวจสอบการอนุญาต</div>
         </div>
     </div>
@@ -221,7 +276,14 @@
         const processBtn = document.getElementById('process-btn');
         const errorMsg = document.getElementById('error-msg');
         
+        const cameraFrame = document.getElementById('camera-frame');
+        const focusRing = document.getElementById('focus-ring');
+        const zoomContainer = document.getElementById('zoom-container');
+        const zoomSlider = document.getElementById('zoom-slider');
+        
         let currentStream = null;
+        let videoTrack = null;
+        let focusTimeout = null;
 
         // เปิดกล้อง
         async function startCamera() {
@@ -241,10 +303,27 @@
                 snapBtn.style.display = 'block';
                 retakeBtn.style.display = 'none';
                 processBtn.style.display = 'none';
+
+                // จัดการระบบ Zoom
+                videoTrack = currentStream.getVideoTracks()[0];
+                const capabilities = videoTrack.getCapabilities();
+                
+                // ตรวจสอบว่าเบราว์เซอร์และมือถือรองรับการซูมหรือไม่
+                if (capabilities.zoom) {
+                    zoomSlider.min = capabilities.zoom.min;
+                    zoomSlider.max = capabilities.zoom.max;
+                    zoomSlider.step = capabilities.zoom.step;
+                    zoomSlider.value = capabilities.zoom.min;
+                    zoomContainer.style.display = 'flex'; // โชว์แถบซูม
+                } else {
+                    zoomContainer.style.display = 'none'; // ซ่อนถ้าไม่รองรับ
+                }
+
             } catch (err) {
                 console.error("Error accessing the camera: ", err);
                 errorMsg.style.display = 'block';
                 snapBtn.style.display = 'none';
+                zoomContainer.style.display = 'none';
             }
         }
 
@@ -255,6 +334,41 @@
                 currentStream = null;
             }
         }
+
+        // Event เมื่อมีการเลื่อนแถบ Zoom
+        zoomSlider.addEventListener('input', (event) => {
+            if (videoTrack) {
+                videoTrack.applyConstraints({
+                    advanced: [{ zoom: event.target.value }]
+                }).catch(err => console.log('Zoom error:', err));
+            }
+        });
+
+        // Event สำหรับแตะเพื่อโฟกัส (Visual Effect)
+        cameraFrame.addEventListener('click', (event) => {
+            // ป้องกันไม่ให้แอนิเมชันทำงานถ้าเผลอกดโดนปุ่มซูม
+            if(event.target.id === 'zoom-slider') return;
+
+            // คำนวณตำแหน่งที่แตะเทียบกับกรอบภาพ
+            const rect = cameraFrame.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+
+            // ย้ายกรอบโฟกัสไปจุดที่แตะและแสดงแอนิเมชัน
+            focusRing.style.left = `${x}px`;
+            focusRing.style.top = `${y}px`;
+            
+            // รีเซ็ตแอนิเมชัน
+            focusRing.classList.remove('focus-animate');
+            void focusRing.offsetWidth; // Trigger reflow
+            focusRing.classList.add('focus-animate');
+
+            // ซ่อนกรอบหลังจากผ่านไป 1 วินาที
+            clearTimeout(focusTimeout);
+            focusTimeout = setTimeout(() => {
+                focusRing.classList.remove('focus-animate');
+            }, 1000);
+        });
 
         // กดถ่ายรูป
         snapBtn.addEventListener('click', () => {
@@ -267,6 +381,7 @@
             
             // สลับ UI
             video.style.display = 'none';
+            zoomContainer.style.display = 'none'; // ซ่อนแถบซูมตอนถ่ายเสร็จ
             canvas.style.display = 'block';
             
             snapBtn.style.display = 'none';
@@ -280,6 +395,11 @@
             video.style.display = 'block';
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
+            // เช็คว่าต้องโชว์แถบซูมไหม
+            if (videoTrack && videoTrack.getCapabilities().zoom) {
+                zoomContainer.style.display = 'flex';
+            }
+
             retakeBtn.style.display = 'none';
             processBtn.style.display = 'none';
             snapBtn.style.display = 'block';
