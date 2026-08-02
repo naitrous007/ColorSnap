@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>ColorSnap - เปลี่ยนรอบตัวเป็นสมุดระบายสี</title>
+    <!-- นำเข้าไลบรารี OpenCV.js แบบ Asynchronous -->
+    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
     <style>
         /* รีเซ็ตค่าเริ่มต้นและตั้งค่าฟอนต์ */
         body {
@@ -162,7 +164,7 @@
             max-width: 150px;
         }
 
-        /* ปุ่มดำเนินการต่อ */
+        /* ปุ่มดำเนินการต่อ (แปลงภาพ) */
         #process-btn {
             display: none;
             background: #4CAF50;
@@ -170,6 +172,16 @@
             flex: 2;
             max-width: 250px;
             box-shadow: 0 4px 10px rgba(76, 175, 80, 0.3);
+        }
+
+        /* ปุ่มบันทึกภาพ (แสดงหลังแปลงเสร็จ) */
+        #save-btn {
+            display: none;
+            background: #2196F3;
+            color: white;
+            flex: 2;
+            max-width: 250px;
+            box-shadow: 0 4px 10px rgba(33, 150, 243, 0.3);
         }
 
         /* แจ้งเตือนข้อผิดพลาดเรื่องกล้อง */
@@ -263,6 +275,7 @@
         <button id="snap-btn" aria-label="Take Photo"></button>
         <button id="retake-btn">ถ่ายใหม่</button>
         <button id="process-btn">แปลงเป็นภาพลายเส้น</button>
+        <button id="save-btn">บันทึกรูปภาพ</button>
     </div>
 
     <script>
@@ -272,6 +285,7 @@
         const snapBtn = document.getElementById('snap-btn');
         const retakeBtn = document.getElementById('retake-btn');
         const processBtn = document.getElementById('process-btn');
+        const saveBtn = document.getElementById('save-btn');
         const errorMsg = document.getElementById('error-msg');
         
         const cameraFrame = document.getElementById('camera-frame');
@@ -282,6 +296,13 @@
         let currentStream = null;
         let videoTrack = null;
         let focusTimeout = null;
+
+        // ตัวแปรเช็คสถานะ OpenCV
+        window.cvReady = false;
+        function onOpenCvReady() {
+            window.cvReady = true;
+            console.log('OpenCV.js is ready.');
+        }
 
         // เปิดกล้อง
         async function startCamera() {
@@ -301,20 +322,20 @@
                 snapBtn.style.display = 'block';
                 retakeBtn.style.display = 'none';
                 processBtn.style.display = 'none';
+                saveBtn.style.display = 'none';
 
                 // จัดการระบบ Zoom
                 videoTrack = currentStream.getVideoTracks()[0];
                 const capabilities = videoTrack.getCapabilities();
                 
-                // ตรวจสอบว่าเบราว์เซอร์และมือถือรองรับการซูมหรือไม่
                 if (capabilities.zoom) {
                     zoomSlider.min = capabilities.zoom.min;
                     zoomSlider.max = capabilities.zoom.max;
                     zoomSlider.step = capabilities.zoom.step;
                     zoomSlider.value = capabilities.zoom.min;
-                    zoomContainer.style.display = 'flex'; // โชว์แถบซูม
+                    zoomContainer.style.display = 'flex';
                 } else {
-                    zoomContainer.style.display = 'none'; // ซ่อนถ้าไม่รองรับ
+                    zoomContainer.style.display = 'none';
                 }
 
             } catch (err) {
@@ -344,24 +365,19 @@
 
         // Event สำหรับแตะเพื่อโฟกัส (Visual Effect)
         cameraFrame.addEventListener('click', (event) => {
-            // ป้องกันไม่ให้แอนิเมชันทำงานถ้าเผลอกดโดนปุ่มซูม
             if(event.target.id === 'zoom-slider') return;
 
-            // คำนวณตำแหน่งที่แตะเทียบกับกรอบภาพ
             const rect = cameraFrame.getBoundingClientRect();
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
 
-            // ย้ายกรอบโฟกัสไปจุดที่แตะและแสดงแอนิเมชัน
             focusRing.style.left = `${x}px`;
             focusRing.style.top = `${y}px`;
             
-            // รีเซ็ตแอนิเมชัน
             focusRing.classList.remove('focus-animate');
-            void focusRing.offsetWidth; // Trigger reflow
+            void focusRing.offsetWidth;
             focusRing.classList.add('focus-animate');
 
-            // ซ่อนกรอบหลังจากผ่านไป 1 วินาที
             clearTimeout(focusTimeout);
             focusTimeout = setTimeout(() => {
                 focusRing.classList.remove('focus-animate');
@@ -379,12 +395,13 @@
             
             // สลับ UI
             video.style.display = 'none';
-            zoomContainer.style.display = 'none'; // ซ่อนแถบซูมตอนถ่ายเสร็จ
+            zoomContainer.style.display = 'none';
             canvas.style.display = 'block';
             
             snapBtn.style.display = 'none';
             retakeBtn.style.display = 'block';
             processBtn.style.display = 'block';
+            saveBtn.style.display = 'none';
         });
 
         // ถ่ายใหม่
@@ -393,20 +410,88 @@
             video.style.display = 'block';
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // เช็คว่าต้องโชว์แถบซูมไหม
             if (videoTrack && videoTrack.getCapabilities().zoom) {
                 zoomContainer.style.display = 'flex';
             }
 
             retakeBtn.style.display = 'none';
             processBtn.style.display = 'none';
+            saveBtn.style.display = 'none';
+            
+            // รีเซ็ตปุ่มแปลงภาพเผื่อถูกกดไปแล้ว
+            processBtn.innerText = "แปลงเป็นภาพลายเส้น";
+            processBtn.disabled = false;
+            
             snapBtn.style.display = 'block';
         });
 
-        // ดำเนินการต่อ
+        // กระบวนการแปลงเป็นภาพลายเส้นด้วย OpenCV.js
         processBtn.addEventListener('click', () => {
-            stopCamera();
-            alert("รูปภาพพร้อมแล้ว! ขั้นตอนต่อไปเราจะนำภาพนี้ไปประมวลผลผ่าน OpenCV.js ครับ");
+            if (!window.cvReady) {
+                alert("ระบบ AI กำลังเตรียมความพร้อม กรุณารอสักครู่แล้วกดใหม่อีกครั้งครับ");
+                return;
+            }
+
+            try {
+                // เปลี่ยนข้อความเพื่อแจ้งสถานะ
+                processBtn.innerText = "กำลังประมวลผล...";
+                processBtn.disabled = true;
+
+                // ใช้ setTimeout เพื่อให้ UI เปลี่ยนข้อความก่อนที่ CPU จะทำงานหนัก
+                setTimeout(() => {
+                    // 1. อ่านภาพจาก Canvas
+                    let src = cv.imread(canvas);
+                    
+                    // 2. แปลงเป็นขาวดำ (Grayscale)
+                    let gray = new cv.Mat();
+                    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
+                    
+                    // 3. ทำ Gaussian Blur เพื่อลด Noise 
+                    let blurred = new cv.Mat();
+                    cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
+                    
+                    // 4. ค้นหาเส้นขอบด้วย Canny Edge Detection
+                    let edges = new cv.Mat();
+                    cv.Canny(blurred, edges, 50, 150, 3, false);
+                    
+                    // 5. สลับสี (Invert) เพื่อให้เส้นเป็นสีดำ และพื้นหลังเป็นสีขาว
+                    let result = new cv.Mat();
+                    cv.bitwise_not(edges, result);
+                    
+                    // 6. วาดภาพผลลัพธ์กลับลงไปที่ Canvas
+                    cv.imshow('photo-canvas', result);
+                    
+                    // เคลียร์หน่วยความจำเพื่อป้องกันเบราว์เซอร์ค้าง
+                    src.delete();
+                    gray.delete();
+                    blurred.delete();
+                    edges.delete();
+                    result.delete();
+                    
+                    // ปิดการใช้งานกล้องอย่างสมบูรณ์เมื่อได้ผลลัพธ์แล้ว
+                    stopCamera();
+                    
+                    // สลับปุ่มเป็น "บันทึกรูปภาพ"
+                    processBtn.style.display = 'none';
+                    saveBtn.style.display = 'block';
+                    
+                }, 100);
+                
+            } catch (err) {
+                console.error("OpenCV Processing Error: ", err);
+                alert("เกิดข้อผิดพลาดในการแปลงภาพ กรุณาลองใหม่อีกครั้ง");
+                processBtn.innerText = "แปลงเป็นภาพลายเส้น";
+                processBtn.disabled = false;
+            }
+        });
+
+        // ฟังก์ชันดาวน์โหลดรูปภาพ
+        saveBtn.addEventListener('click', () => {
+            const dataURL = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = 'ColorSnap-LineArt.png';
+            link.href = dataURL;
+            link.click();
         });
 
         // โหลดเสร็จให้เริ่มกล้อง
