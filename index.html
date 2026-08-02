@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="th">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>ColorSnap - เปลี่ยนรอบตัวเป็นสมุดระบายสี</title>
     <!-- นำเข้าไลบรารี OpenCV.js แบบ Asynchronous -->
-    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+    <script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();"
+        type="text/javascript"></script>
     <style>
         /* รีเซ็ตค่าเริ่มต้นและตั้งค่าฟอนต์ */
         body {
@@ -55,13 +58,16 @@
             height: 100%;
             position: relative;
             background: #1a1a1a;
-            overflow: hidden; /* ป้องกันกรอบโฟกัสล้นขอบ */
+            overflow: hidden;
+            /* ป้องกันกรอบโฟกัสล้นขอบ */
         }
 
-        video, canvas {
+        video,
+        canvas {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* บังคับภาพให้เต็มกรอบโดยไม่ผิดสัดส่วน */
+            object-fit: cover;
+            /* บังคับภาพให้เต็มกรอบโดยไม่ผิดสัดส่วน */
             display: block;
         }
 
@@ -76,7 +82,8 @@
             height: 60px;
             border: 2px solid #FFD700;
             border-radius: 10px;
-            pointer-events: none; /* ให้กดทะลุได้ */
+            pointer-events: none;
+            /* ให้กดทะลุได้ */
             opacity: 0;
             transform: translate(-50%, -50%) scale(1.5);
             transition: all 0.3s ease-out;
@@ -100,7 +107,8 @@
             backdrop-filter: blur(5px);
             padding: 10px 15px;
             border-radius: 20px;
-            display: none; /* ซ่อนไว้ก่อน จะเปิดผ่าน JS */
+            display: none;
+            /* ซ่อนไว้ก่อน จะเปิดผ่าน JS */
             align-items: center;
             gap: 10px;
             z-index: 10;
@@ -195,7 +203,7 @@
             padding: 20px;
             display: none;
             font-size: 1.1rem;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0, 0, 0, 0.8);
             border-radius: 10px;
             width: 80%;
             z-index: 20;
@@ -228,21 +236,34 @@
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            50% { transform: rotate(90deg); }
-            100% { transform: rotate(0deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            50% {
+                transform: rotate(90deg);
+            }
+
+            100% {
+                transform: rotate(0deg);
+            }
         }
 
         @media (orientation: landscape) {
-            header, #main-container, .controls {
+
+            header,
+            #main-container,
+            .controls {
                 display: none !important;
             }
+
             #landscape-warning {
                 display: flex !important;
             }
         }
     </style>
 </head>
+
 <body>
 
     <!-- หน้าจอแจ้งเตือนเมื่อหมุนเครื่องเป็นแนวนอน -->
@@ -260,7 +281,7 @@
             <video id="camera-stream" autoplay playsinline></video>
             <canvas id="photo-canvas"></canvas>
             <div id="focus-ring"></div>
-            
+
             <!-- แถบเลื่อนซูม -->
             <div id="zoom-container">
                 <span>🔍</span>
@@ -287,12 +308,12 @@
         const processBtn = document.getElementById('process-btn');
         const saveBtn = document.getElementById('save-btn');
         const errorMsg = document.getElementById('error-msg');
-        
+
         const cameraFrame = document.getElementById('camera-frame');
         const focusRing = document.getElementById('focus-ring');
         const zoomContainer = document.getElementById('zoom-container');
         const zoomSlider = document.getElementById('zoom-slider');
-        
+
         let currentStream = null;
         let videoTrack = null;
         let focusTimeout = null;
@@ -308,17 +329,17 @@
         async function startCamera() {
             try {
                 currentStream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
+                    video: {
                         facingMode: 'environment',
                         width: { ideal: 1920 },
                         height: { ideal: 1080 }
                     },
                     audio: false
                 });
-                
+
                 video.srcObject = currentStream;
                 errorMsg.style.display = 'none';
-                
+
                 snapBtn.style.display = 'block';
                 retakeBtn.style.display = 'none';
                 processBtn.style.display = 'none';
@@ -327,7 +348,7 @@
                 // จัดการระบบ Zoom
                 videoTrack = currentStream.getVideoTracks()[0];
                 const capabilities = videoTrack.getCapabilities();
-                
+
                 if (capabilities.zoom) {
                     zoomSlider.min = capabilities.zoom.min;
                     zoomSlider.max = capabilities.zoom.max;
@@ -365,7 +386,7 @@
 
         // Event สำหรับแตะเพื่อโฟกัส (Visual Effect)
         cameraFrame.addEventListener('click', (event) => {
-            if(event.target.id === 'zoom-slider') return;
+            if (event.target.id === 'zoom-slider') return;
 
             const rect = cameraFrame.getBoundingClientRect();
             const x = event.clientX - rect.left;
@@ -373,7 +394,7 @@
 
             focusRing.style.left = `${x}px`;
             focusRing.style.top = `${y}px`;
-            
+
             focusRing.classList.remove('focus-animate');
             void focusRing.offsetWidth;
             focusRing.classList.add('focus-animate');
@@ -392,45 +413,43 @@
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
+
             // สลับ UI
             video.style.display = 'none';
             zoomContainer.style.display = 'none';
             canvas.style.display = 'block';
-            
+
             snapBtn.style.display = 'none';
             retakeBtn.style.display = 'block';
             processBtn.style.display = 'block';
             saveBtn.style.display = 'none';
         });
 
-        // ถ่ายใหม่ (อัปเดตแก้บั๊กกล้องมืด)
+        // ถ่ายใหม่
         retakeBtn.addEventListener('click', () => {
             canvas.style.display = 'none';
             video.style.display = 'block';
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
+
             // ตรวจสอบว่ากล้องถูกปิดไปหรือยัง ถ้าปิดไปแล้วให้เปิดใหม่
             if (!currentStream) {
                 startCamera();
             } else {
-                // ถ้ายังเปิดอยู่ (แค่กดถ่ายแต่ยังไม่ได้แปลงภาพ)
                 if (videoTrack && videoTrack.getCapabilities().zoom) {
                     zoomContainer.style.display = 'flex';
                 }
                 retakeBtn.style.display = 'none';
                 processBtn.style.display = 'none';
                 saveBtn.style.display = 'none';
-                
-                // รีเซ็ตปุ่มแปลงภาพ
+
                 processBtn.innerText = "แปลงเป็นภาพลายเส้น";
                 processBtn.disabled = false;
-                
+
                 snapBtn.style.display = 'block';
             }
         });
 
-        // กระบวนการแปลงเป็นภาพลายเส้นด้วย OpenCV.js (ปรับปรุงคุณภาพใหม่ทั้งหมด)
+        // กระบวนการแปลงเป็นภาพลายเส้นด้วย OpenCV.js (ระบบ Adaptive Thresholding แก้ปัญหาเงา)
         processBtn.addEventListener('click', () => {
             if (!window.cvReady) {
                 alert("ระบบ AI กำลังเตรียมความพร้อม กรุณารอสักครู่แล้วกดใหม่อีกครั้งครับ");
@@ -438,63 +457,56 @@
             }
 
             try {
-                // เปลี่ยนข้อความเพื่อแจ้งสถานะ
                 processBtn.innerText = "กำลังประมวลผล...";
                 processBtn.disabled = true;
 
-                // ใช้ setTimeout เพื่อให้ UI เปลี่ยนข้อความก่อนที่ CPU จะทำงานหนัก
                 setTimeout(() => {
                     // 1. อ่านภาพจาก Canvas
                     let src = cv.imread(canvas);
-                    
+
                     // 2. แปลงเป็นขาวดำ (Grayscale)
                     let gray = new cv.Mat();
                     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
-                    
-                    // 3. ลบรายละเอียดพื้นผิว (Texture/Noise) ด้วย Median Blur
-                    // (สำคัญมาก: ช่วยให้ไม่เกิดเส้นยิบย่อยบนพื้นผิวสิ่งของ ใช้ค่า 7 เพื่อให้เนียน)
+
+                    // 3. ลด noise พื้นผิวก่อน (Median Blur ไม่ทำให้เส้นเบลอ)
                     let blurred = new cv.Mat();
-                    cv.medianBlur(gray, blurred, 7); 
-                    
-                    // 4. ค้นหาเส้นขอบด้วย Canny Edge
+                    cv.medianBlur(gray, blurred, 5);
+
+                    // 4. แก้ปัญหาเงาด้วย Adaptive Thresholding
+                    // คำนวณแสงเฉพาะจุด ทำให้สามารถดึงเส้นในที่มืดออกมาได้ ผลลัพธ์ได้พื้นขาวเส้นดำทันที
                     let edges = new cv.Mat();
-                    cv.Canny(blurred, edges, 40, 100, 3, false);
-                    
-                    // 5. เชื่อมเส้นที่ขาดและทำให้เส้นหนาขึ้นด้วยหัวแปรงแบบวงกลม (Ellipse)
+                    cv.adaptiveThreshold(blurred, edges, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 4);
+
+                    // 5. เชื่อมเส้นที่ขาดและเพิ่มความหนา (Erode บนภาพพื้นขาวเส้นดำ = เส้นดำจะหนาขึ้น)
                     let thickEdges = new cv.Mat();
                     let kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(3, 3));
-                    cv.dilate(edges, thickEdges, kernel, new cv.Point(-1, -1), 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
-                    
-                    // 6. ทำ Anti-Aliasing (ลบรอยหยัก) เพื่อให้เส้นขอบนุ่มนวลเหมือนวาดด้วยปากกา
-                    let smoothEdges = new cv.Mat();
-                    cv.GaussianBlur(thickEdges, smoothEdges, new cv.Size(3, 3), 0, 0, cv.BORDER_DEFAULT);
-                    
-                    // 7. สลับสี (Invert) เพื่อให้เส้นเป็นสีดำ และพื้นหลังเป็นสีขาว
+                    cv.erode(edges, thickEdges, kernel, new cv.Point(-1, -1), 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
+
+                    // 6. ลบรอยหยักพิกเซลให้เรียบเนียนเหมือนสมุดระบายสี
                     let result = new cv.Mat();
-                    cv.bitwise_not(smoothEdges, result);
-                    
-                    // 8. วาดภาพผลลัพธ์กลับลงไปที่ Canvas
+                    cv.medianBlur(thickEdges, result, 3);
+
+                    // 7. วาดภาพผลลัพธ์กลับลงไปที่ Canvas
                     cv.imshow('photo-canvas', result);
-                    
-                    // เคลียร์หน่วยความจำเพื่อป้องกันเบราว์เซอร์ค้าง
+
+                    // เคลียร์หน่วยความจำ
                     src.delete();
                     gray.delete();
                     blurred.delete();
                     edges.delete();
                     thickEdges.delete();
                     kernel.delete();
-                    smoothEdges.delete();
                     result.delete();
-                    
-                    // ปิดการใช้งานกล้องเพื่อประหยัดแบตเตอรี่
+
+                    // ปิดกล้อง
                     stopCamera();
-                    
+
                     // สลับปุ่มเป็น "บันทึกรูปภาพ"
                     processBtn.style.display = 'none';
                     saveBtn.style.display = 'block';
-                    
+
                 }, 100);
-                
+
             } catch (err) {
                 console.error("OpenCV Processing Error: ", err);
                 alert("เกิดข้อผิดพลาดในการแปลงภาพ กรุณาลองใหม่อีกครั้ง");
@@ -516,4 +528,5 @@
         window.addEventListener('load', startCamera);
     </script>
 </body>
+
 </html>
