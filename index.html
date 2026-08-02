@@ -404,28 +404,33 @@
             saveBtn.style.display = 'none';
         });
 
-        // ถ่ายใหม่
+        // ถ่ายใหม่ (อัปเดตแก้บั๊กกล้องมืด)
         retakeBtn.addEventListener('click', () => {
             canvas.style.display = 'none';
             video.style.display = 'block';
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            if (videoTrack && videoTrack.getCapabilities().zoom) {
-                zoomContainer.style.display = 'flex';
+            // ตรวจสอบว่ากล้องถูกปิดไปหรือยัง ถ้าปิดไปแล้วให้เปิดใหม่
+            if (!currentStream) {
+                startCamera();
+            } else {
+                // ถ้ายังเปิดอยู่ (แค่กดถ่ายแต่ยังไม่ได้แปลงภาพ)
+                if (videoTrack && videoTrack.getCapabilities().zoom) {
+                    zoomContainer.style.display = 'flex';
+                }
+                retakeBtn.style.display = 'none';
+                processBtn.style.display = 'none';
+                saveBtn.style.display = 'none';
+                
+                // รีเซ็ตปุ่มแปลงภาพ
+                processBtn.innerText = "แปลงเป็นภาพลายเส้น";
+                processBtn.disabled = false;
+                
+                snapBtn.style.display = 'block';
             }
-
-            retakeBtn.style.display = 'none';
-            processBtn.style.display = 'none';
-            saveBtn.style.display = 'none';
-            
-            // รีเซ็ตปุ่มแปลงภาพเผื่อถูกกดไปแล้ว
-            processBtn.innerText = "แปลงเป็นภาพลายเส้น";
-            processBtn.disabled = false;
-            
-            snapBtn.style.display = 'block';
         });
 
-        // กระบวนการแปลงเป็นภาพลายเส้นด้วย OpenCV.js
+        // กระบวนการแปลงเป็นภาพลายเส้นด้วย OpenCV.js (อัปเดตเทคนิคเพิ่มความหนาเส้น)
         processBtn.addEventListener('click', () => {
             if (!window.cvReady) {
                 alert("ระบบ AI กำลังเตรียมความพร้อม กรุณารอสักครู่แล้วกดใหม่อีกครั้งครับ");
@@ -446,19 +451,24 @@
                     let gray = new cv.Mat();
                     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY, 0);
                     
-                    // 3. ทำ Gaussian Blur เพื่อลด Noise 
+                    // 3. ทำ Gaussian Blur เพิ่มขึ้นเพื่อลบ Noise หรือลวดลายเล็กๆ บนพื้นผิว
                     let blurred = new cv.Mat();
-                    cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
+                    cv.GaussianBlur(gray, blurred, new cv.Size(7, 7), 0, 0, cv.BORDER_DEFAULT);
                     
-                    // 4. ค้นหาเส้นขอบด้วย Canny Edge Detection
+                    // 4. ค้นหาเส้นขอบด้วย Canny Edge (ปรับให้จับเส้นได้กว้างขึ้น ไม่ขาดง่าย)
                     let edges = new cv.Mat();
-                    cv.Canny(blurred, edges, 50, 150, 3, false);
+                    cv.Canny(blurred, edges, 30, 90, 3, false);
                     
-                    // 5. สลับสี (Invert) เพื่อให้เส้นเป็นสีดำ และพื้นหลังเป็นสีขาว
+                    // 5. เพิ่มความหนาของเส้น (Dilation) ให้เหมือนลายเส้นปากกา
+                    let thickEdges = new cv.Mat();
+                    let kernel = cv.Mat.ones(2, 2, cv.CV_8U); // ใช้แปรงขนาด 2x2 พิกเซล
+                    cv.dilate(edges, thickEdges, kernel, new cv.Point(-1, -1), 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
+                    
+                    // 6. สลับสี (Invert) เพื่อให้เส้นเป็นสีดำ และพื้นหลังเป็นสีขาว
                     let result = new cv.Mat();
-                    cv.bitwise_not(edges, result);
+                    cv.bitwise_not(thickEdges, result);
                     
-                    // 6. วาดภาพผลลัพธ์กลับลงไปที่ Canvas
+                    // 7. วาดภาพผลลัพธ์กลับลงไปที่ Canvas
                     cv.imshow('photo-canvas', result);
                     
                     // เคลียร์หน่วยความจำเพื่อป้องกันเบราว์เซอร์ค้าง
@@ -466,9 +476,11 @@
                     gray.delete();
                     blurred.delete();
                     edges.delete();
+                    thickEdges.delete();
+                    kernel.delete();
                     result.delete();
                     
-                    // ปิดการใช้งานกล้องอย่างสมบูรณ์เมื่อได้ผลลัพธ์แล้ว
+                    // ปิดการใช้งานกล้องเพื่อประหยัดแบตเตอรี่
                     stopCamera();
                     
                     // สลับปุ่มเป็น "บันทึกรูปภาพ"
